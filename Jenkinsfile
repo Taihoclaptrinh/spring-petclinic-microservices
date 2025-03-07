@@ -2,9 +2,6 @@
 
 pipeline {
     agent any
-    environment {
-        GITHUB_TOKEN = credentials('github-token') // ID của credential trong Jenkins
-    }
     stages {
         stage('Checkout') {
             steps {
@@ -45,11 +42,7 @@ pipeline {
                     for (service in services) {
                         dir(service) {
                             sh "mvn test jacoco:report"
-                            step([$class: 'JacocoPublisher',
-                                  execPattern: 'target/jacoco.exec',
-                                  classPattern: 'target/classes',
-                                  sourcePattern: 'src/main/java',
-                                  exclusionPattern: '**/*Test.class'])
+                            publishCoverage adapters: [jacocoAdapter('target/jacoco.exec')]
                             junit 'target/surefire-reports/*.xml'
                             def coverageReport = readFile('target/site/jacoco/index.html')
                             def coverage = coverageReport.find(/<td>Total<\/td>.*?<td>(\d+\.\d+)/) { match, cov -> cov.toFloat() }
@@ -86,20 +79,22 @@ pipeline {
 }
 
 def notifyGitHub(String state, String context, String description) {
-    def commitSha = env.GIT_COMMIT
-    def repoUrl = "https://api.github.com/repos/Taihoclaptrinh/spring-petclinic-microservices/statuses/${commitSha}"
-    def buildUrl = "${env.BUILD_URL}"
-    def payload = """{
-        "state": "${state}",
-        "target_url": "${buildUrl}",
-        "description": "${description}",
-        "context": "${context}"
-    }"""
-    sh """
-        curl -X POST \
-        -H "Authorization: token ${env.GITHUB_TOKEN}" \
-        -H "Content-Type: application/json" \
-        -d '${payload}' \
-        "${repoUrl}"
-    """
+    withCredentials([string(credentialsId: 'github-token1', variable: 'TOKEN')]) {
+        def commitSha = env.GIT_COMMIT
+        def repoUrl = "https://api.github.com/repos/Taihoclaptrinh/spring-petclinic-microservices/statuses/${commitSha}"
+        def buildUrl = "${env.BUILD_URL}"
+        def payload = """{
+            "state": "${state}",
+            "target_url": "${buildUrl}",
+            "description": "${description}",
+            "context": "${context}"
+        }"""
+        sh """
+            curl -X POST \
+            -H "Authorization: token ${TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '${payload}' \
+            "${repoUrl}"
+        """
+    }
 }
