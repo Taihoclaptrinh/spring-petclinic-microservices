@@ -3,7 +3,7 @@ pipeline {
     
     environment {
         // Lấy tên branch và commit ID
-        BRANCH_NAME = env.BRANCH_NAME
+        BRANCH_NAME = ${env.BRANCH_NAME}
         COMMIT_ID = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
         
         // Credentials Docker Hub
