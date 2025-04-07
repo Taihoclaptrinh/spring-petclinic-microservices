@@ -66,5 +66,12 @@ pipeline {
         success {
             echo "Successfully built and pushed all images with commit ID: ${COMMIT_ID}"
         }
+        failure {
+            echo "Pipeline failed. Please check the logs for details."
+        }
+        always {
+            // Cleanup
+            sh "docker system prune -f"
+        }
     }
 }
