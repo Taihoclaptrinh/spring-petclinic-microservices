@@ -19,14 +19,14 @@ pipeline {
                     echo "Commit ID: ${COMMIT_ID}"
                     
                     def services = [
-                        [name: 'spring-petclinic-config-server', port: '8888'],
-                        [name: 'spring-petclinic-discovery-server', port: '8761'],
-                        [name: 'spring-petclinic-customers-service', port: '8081'],
-                        [name: 'spring-petclinic-visits-service', port: '8082'],
-                        [name: 'spring-petclinic-vets-service', port: '8083'],
-                        [name: 'spring-petclinic-genai-service', port: '8084']
-                        [name: 'spring-petclinic-api-gateway', port: '8080'],
-                        [name: 'spring-petclinic-admin-server', port: '9090'],
+                        ['spring-petclinic-config-server', '8888'],
+                        ['spring-petclinic-discovery-server', '8761'],
+                        ['spring-petclinic-customers-service', '8081'],
+                        ['spring-petclinic-visits-service', '8082'],
+                        ['spring-petclinic-vets-service', '8083'],
+                        ['spring-petclinic-genai-service', '8084']
+                        ['spring-petclinic-api-gateway', '8080'],
+                        ['spring-petclinic-admin-server', '9090'],
                     ]
                     
                     // Đăng nhập vào Docker Hub
@@ -36,23 +36,25 @@ pipeline {
                     
                     // Build và push image cho từng service
                     services.each { service ->
-                        echo "Building service: ${service.name} on port: ${service.port}"
+                        def serviceName = service[0]
+                        def servicePort = service[1]
+                        echo "Building service: ${serviceName} on port: ${servicePort}"
                         
                         // Build Docker image với tag là commit ID và truyền SERVICE_NAME và SERVICE_PORT
                         sh """
                             docker build \
-                            --build-arg SERVICE_NAME=${service.name} \
-                            --build-arg SERVICE_PORT=${service.port} \
-                            -t ${DOCKER_REGISTRY}:${service.name}-${COMMIT_ID} .
+                            --build-arg SERVICE_NAME=${serviceName} \
+                            --build-arg SERVICE_PORT=${servicePort} \
+                            -t ${DOCKER_REGISTRY}:${serviceName}-${COMMIT_ID} .
                         """
                         
                         // Push image lên Docker Hub
-                        sh "docker push ${DOCKER_REGISTRY}:${service.name}-${COMMIT_ID}"
+                        sh "docker push ${DOCKER_REGISTRY}:${serviceName}-${COMMIT_ID}"
                         
                         // Nếu là branch main, cũng tag và push như main
                         if (BRANCH_NAME == 'main') {
-                            sh "docker tag ${DOCKER_REGISTRY}:${service.name}-${COMMIT_ID} ${DOCKER_REGISTRY}:${service.name}-main"
-                            sh "docker push ${DOCKER_REGISTRY}:${service.name}-main"
+                            sh "docker tag ${DOCKER_REGISTRY}:${serviceName}-${COMMIT_ID} ${DOCKER_REGISTRY}:${serviceName}-main"
+                            sh "docker push ${DOCKER_REGISTRY}:${serviceName}-main"
                         }
                     }
                 }
