@@ -1,0 +1,327 @@
+# Config Server
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: config-server
+  namespace: ${NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: config-server
+  template:
+    metadata:
+      labels:
+        app: config-server
+    spec:
+      containers:
+      - name: config-server
+        image: ${DOCKER_REGISTRY}/spring-petclinic-config-server-${CONFIG_TAG}
+        ports:
+        - containerPort: 8888
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: kubernetes
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: config-server
+  namespace: ${NAMESPACE}
+spec:
+  type: ClusterIP
+  selector:
+    app: config-server
+  ports:
+  - port: 8888
+    targetPort: 8888
+---
+# Discovery Server
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: discovery-server
+  namespace: ${NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: discovery-server
+  template:
+    metadata:
+      labels:
+        app: discovery-server
+    spec:
+      containers:
+      - name: discovery-server
+        image: ${DOCKER_REGISTRY}/spring-petclinic-discovery-server-${DISCOVERY_TAG}
+        ports:
+        - containerPort: 8761
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: kubernetes
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: discovery-server
+  namespace: ${NAMESPACE}
+spec:
+  type: ClusterIP
+  selector:
+    app: discovery-server
+  ports:
+  - port: 8761
+    targetPort: 8761
+---
+# Customers Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: customers-service
+  namespace: ${NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: customers-service
+  template:
+    metadata:
+      labels:
+        app: customers-service
+    spec:
+      containers:
+      - name: customers-service
+        image: ${DOCKER_REGISTRY}/spring-petclinic-customers-service-${CUSTOMERS_TAG}
+        ports:
+        - containerPort: 8081
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: kubernetes
+        - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+          value: http://discovery.${NAMESPACE}.svc.cluster.local:8761/eureka/
+        - name: SPRING_CLOUD_CONFIG_URI
+          value: http://config.${NAMESPACE}.svc.cluster.local:8888
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: customers-service
+  namespace: ${NAMESPACE}
+spec:
+  type: ClusterIP
+  selector:
+    app: customers-service
+  ports:
+  - port: 8081
+    targetPort: 8081
+---
+# Visits Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: visits-service
+  namespace: ${NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: visits-service
+  template:
+    metadata:
+      labels:
+        app: visits-service
+    spec:
+      containers:
+      - name: visits-service
+        image: ${DOCKER_REGISTRY}/spring-petclinic-visits-service-${VISITS_TAG}
+        ports:
+        - containerPort: 8082
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: kubernetes
+        - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+          value: http://discovery.${NAMESPACE}.svc.cluster.local:8761/eureka/
+        - name: SPRING_CLOUD_CONFIG_URI
+          value: http://config.${NAMESPACE}.svc.cluster.local:8888
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: visits-service
+  namespace: ${NAMESPACE}
+spec:
+  type: ClusterIP
+  selector:
+    app: visits-service
+  ports:
+  - port: 8082
+    targetPort: 8082
+---
+# Vets Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vets-service
+  namespace: ${NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vets-service
+  template:
+    metadata:
+      labels:
+        app: vets-service
+    spec:
+      containers:
+      - name: vets-service
+        image: ${DOCKER_REGISTRY}/spring-petclinic-vets-service-${VETS_TAG}
+        ports:
+        - containerPort: 8083
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: kubernetes
+        - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+          value: http://discovery.${NAMESPACE}.svc.cluster.local:8761/eureka/
+        - name: SPRING_CLOUD_CONFIG_URI
+          value: http://config.${NAMESPACE}.svc.cluster.local:8888
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vets-service
+  namespace: ${NAMESPACE}
+spec:
+  type: ClusterIP
+  selector:
+    app: vets-service
+  ports:
+  - port: 8083
+    targetPort: 8083
+---
+# GenAI Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: genai-service
+  namespace: ${NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: genai-service
+  template:
+    metadata:
+      labels:
+        app: genai-service
+    spec:
+      containers:
+      - name: genai-service
+        image: ${DOCKER_REGISTRY}/spring-petclinic-genai-service-${GENAI_TAG}
+        ports:
+        - containerPort: 8084
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: kubernetes
+        - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+          value: http://discovery.${NAMESPACE}.svc.cluster.local:8761/eureka/
+        - name: SPRING_CLOUD_CONFIG_URI
+          value: http://config.${NAMESPACE}.svc.cluster.local:8888
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: genai-service
+  namespace: ${NAMESPACE}
+spec:
+  type: ClusterIP
+  selector:
+    app: genai-service
+  ports:
+  - port: 8084
+    targetPort: 8084
+---
+# Admin Server
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: admin-server
+  namespace: ${NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: admin-server
+  template:
+    metadata:
+      labels:
+        app: admin-server
+    spec:
+      containers:
+      - name: admin-server
+        image: ${DOCKER_REGISTRY}/spring-petclinic-admin-server-${ADMIN_TAG}
+        ports:
+        - containerPort: 9090
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: kubernetes
+        - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+          value: http://discovery.${NAMESPACE}.svc.cluster.local:8761/eureka/
+        - name: SPRING_CLOUD_CONFIG_URI
+          value: http://config.${NAMESPACE}.svc.cluster.local:8888
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: admin-server
+  namespace: ${NAMESPACE}
+spec:
+  type: ClusterIP
+  selector:
+    app: admin-server
+  ports:
+  - port: 9090
+    targetPort: 9090
+---
+# API Gateway
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: ${NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      containers:
+      - name: api-gateway
+        image: ${DOCKER_REGISTRY}/spring-petclinic-api-gateway-${API_GATEWAY_TAG}
+        ports:
+        - containerPort: 8080
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: kubernetes
+        - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+          value: http://discovery.${NAMESPACE}.svc.cluster.local:8761/eureka/
+        - name: SPRING_CLOUD_CONFIG_URI
+          value: http://config.${NAMESPACE}.svc.cluster.local:8888
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: ${NAMESPACE}
+spec:
+  type: NodePort
+  selector:
+    app: api-gateway
+  ports:
+  - port: 8080
+    targetPort: 8080

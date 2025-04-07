@@ -1,0 +1,189 @@
+pipeline {
+    agent {
+        label 'k8s-agent'
+    }
+    
+    parameters {
+        string(name: 'api-gateway', defaultValue: 'main', description: '')
+        string(name: 'customers-service', defaultValue: 'main', description: '')
+        string(name: 'vets-service', defaultValue: 'main', description: '')
+        string(name: 'visits-service', defaultValue: 'main', description: '')
+        string(name: 'admin-server', defaultValue: 'main', description: '')
+        string(name: 'discovery-server', defaultValue: 'main', description: '')
+        string(name: 'config-server', defaultValue: 'main', description: '')
+        string(name: 'genai-service', defaultValue: 'main', description: '')
+    }
+    
+    environment {
+        NAMESPACE = "developer-${BUILD_NUMBER}"
+        DOCKER_REGISTRY = 'chitaialm/petclinic'
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        stage('Get Commit IDs') {
+            steps {
+                script {
+                    // Lấy commit ID cho mỗi branch không phải main
+                    if (params.api-gateway != 'main') {
+                        env.API_GATEWAY_TAG = getCommitId('spring-petclinic-api-gateway', params.api-gateway)
+                    } else {
+                        env.API_GATEWAY_TAG = 'main'
+                    }
+                    
+                    if (params.customers-service != 'main') {
+                        env.CUSTOMERS_TAG = getCommitId('spring-petclinic-customers-service', params.customers-service)
+                    } else {
+                        env.CUSTOMERS_TAG = 'main'
+                    }
+                    
+                    if (params.vets-service != 'main') {
+                        env.VETS_TAG = getCommitId('spring-petclinic-vets-service', params.vets-service)
+                    } else {
+                        env.VETS_TAG = 'main'
+                    }
+                    
+                    if (params.visits-service != 'main') {
+                        env.VISITS_TAG = getCommitId('spring-petclinic-visits-service', params.visits-service)
+                    } else {
+                        env.VISITS_TAG = 'main'
+                    }
+                    
+                    if (params.admin-server != 'main') {
+                        env.ADMIN_TAG = getCommitId('spring-petclinic-admin-server', params.admin-server)
+                    } else {
+                        env.ADMIN_TAG = 'main'
+                    }
+                    
+                    if (params.discovery-server != 'main') {
+                        env.DISCOVERY_TAG = getCommitId('spring-petclinic-discovery-server', params.discovery-server)
+                    } else {
+                        env.DISCOVERY_TAG = 'main'
+                    }
+                    
+                    if (params.config-server != 'main') {
+                        env.CONFIG_TAG = getCommitId('spring-petclinic-config-server', params.config-server)
+                    } else {
+                        env.CONFIG_TAG = 'main'
+                    }
+                    
+                    if (params.genai-service != 'main') {
+                        env.GENAI_TAG = getCommitId('spring-petclinic-genai-service', params.genai-service)
+                    } else {
+                        env.GENAI_TAG = 'main'
+                    }
+                }
+            }
+        }
+        
+        stage('Create Namespace') {
+            steps {
+                sh "kubectl create namespace ${NAMESPACE}"
+                echo "Created namespace: ${NAMESPACE}"
+            }
+        }
+        
+        stage('Deploy Services') {
+            steps {
+                script {
+                    // Đọc template file
+                    def templateContent = readFile('k8s/templates/developer-template.yaml')
+                    
+                    // Thay thế các biến trong template
+                    def manifest = templateContent
+                        .replaceAll('\\$\\{NAMESPACE\\}', "${NAMESPACE}")
+                        .replaceAll('\\$\\{DOCKER_REGISTRY\\}', "${DOCKER_REGISTRY}")
+                        .replaceAll('\\$\\{API_GATEWAY_TAG\\}', "${API_GATEWAY_TAG}")
+                        .replaceAll('\\$\\{CUSTOMERS_TAG\\}', "${CUSTOMERS_TAG}")
+                        .replaceAll('\\$\\{VETS_TAG\\}', "${VETS_TAG}")
+                        .replaceAll('\\$\\{VISITS_TAG\\}', "${VISITS_TAG}")
+                        .replaceAll('\\$\\{ADMIN_TAG\\}', "${ADMIN_TAG}")
+                        .replaceAll('\\$\\{DISCOVERY_TAG\\}', "${DISCOVERY_TAG}")
+                        .replaceAll('\\$\\{CONFIG_TAG\\}', "${CONFIG_TAG}")
+                        .replaceAll('\\$\\{GENAI_TAG\\}', "${GENAI_TAG}")
+                    
+                    // Lưu manifest đã thay thế vào file
+                    writeFile file: 'developer-manifest.yaml', text: manifest
+                    
+                    // Apply manifest
+                    sh "kubectl apply -f developer-manifest.yaml"
+                    
+                    // Đợi các service cơ bản khởi động
+                    sh "kubectl rollout status deployment/discovery -n ${NAMESPACE} --timeout=120s"
+                    sh "kubectl rollout status deployment/config -n ${NAMESPACE} --timeout=120s"
+                    
+                    // Đợi API Gateway khởi động
+                    sh "kubectl rollout status deployment/api-gateway -n ${NAMESPACE} --timeout=180s"
+                }
+            }
+        }
+        
+        stage('Print Access Information') {
+            steps {
+                script {
+                    // Lấy IP của worker node
+                    def nodeIP = sh(script: "kubectl get nodes -o wide | grep worker | awk '{print \$6}'", returnStdout: true).trim()
+                    
+                    // Lấy NodePort của API Gateway
+                    def apiGatewayPort = sh(script: "kubectl get svc api-gateway -n ${NAMESPACE} -o jsonpath='{.spec.ports[0].nodePort}'", returnStdout: true).trim()
+                    
+                    // Tạo URL cho cleanup job
+                    def jenkinsUrl = env.JENKINS_URL ?: 'http://jenkins:8080/'
+                    def cleanupUrl = "${jenkinsUrl}job/cleanup_developer_deployment/parambuild?NAMESPACE=${NAMESPACE}"
+                    
+                    echo """
+                    ====== DEPLOYMENT INFORMATION ======
+                    
+                    Your application has been deployed to namespace: ${NAMESPACE}
+                    
+                    To access your application:
+                    
+                    1. Add the following line to your /etc/hosts file:
+                       ${nodeIP} petclinic.dev
+                    
+                    2. Access the application at:
+                       http://petclinic.dev:${apiGatewayPort}
+                    
+                    Deployed services:
+                    - API Gateway: ${params.API_GATEWAY_BRANCH} (${env.API_GATEWAY_TAG})
+                    - Customers Service: ${params.CUSTOMERS_BRANCH} (${env.CUSTOMERS_TAG})
+                    - Vets Service: ${params.VETS_BRANCH} (${env.VETS_TAG})
+                    - Visits Service: ${params.VISITS_BRANCH} (${env.VISITS_TAG})
+                    - Admin Server: ${params.ADMIN_BRANCH} (${env.ADMIN_TAG})
+                    - Discovery Server: ${params.DISCOVERY_BRANCH} (${env.DISCOVERY_TAG})
+                    - Config Server: ${params.CONFIG_BRANCH} (${env.CONFIG_TAG})
+                    - GenAI Service: ${params.GENAI_BRANCH} (${env.GENAI_TAG})
+                    
+                    To delete this deployment when you're done testing:
+                    Run the cleanup job with parameter NAMESPACE=${NAMESPACE}
+                    Cleanup URL: ${cleanupUrl}
+                    """
+                }
+            }
+        }
+    }
+    
+    post {
+        failure {
+            echo "Deployment failed. Cleaning up namespace ${NAMESPACE}"
+            sh "kubectl delete namespace ${NAMESPACE} || true"
+        }
+    }
+}
+
+def getCommitId(serviceName, branch) {
+    // Lấy commit ID của branch từ repository forked của bạn
+    def commitId = sh(
+        script: "git ls-remote https://github.com/Taihoclaptrinh/spring-petclinic-microservices.git refs/heads/${branch} | cut -f 1 | head -n 1",
+        returnStdout: true
+    ).trim().take(7)  // Lấy 7 ký tự đầu của commit ID
+    
+    echo "Service: ${serviceName}, Branch: ${branch}, Commit ID: ${commitId}"
+    
+    return commitId ?: branch  // Nếu không lấy được commit ID, sử dụng tên branch
+}
