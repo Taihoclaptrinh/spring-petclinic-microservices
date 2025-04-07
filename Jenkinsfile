@@ -24,7 +24,7 @@ pipeline {
                         ['spring-petclinic-customers-service', '8081'],
                         ['spring-petclinic-visits-service', '8082'],
                         ['spring-petclinic-vets-service', '8083'],
-                        ['spring-petclinic-genai-service', '8084']
+                        ['spring-petclinic-genai-service', '8084'],
                         ['spring-petclinic-api-gateway', '8080'],
                         ['spring-petclinic-admin-server', '9090'],
                     ]
